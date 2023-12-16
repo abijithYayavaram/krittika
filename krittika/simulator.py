@@ -25,17 +25,19 @@ class Simulator:
         self.reports_dir_path = './'
 
         # REPORT Structures
-        self.total_cycles_report_grid = []
-        self.stall_cycles_report_grid = []
-        self.overall_utils_report_grid = []
-        self.mapping_eff_report_grid = []
+        # self.total_cycles_report_grid = []
+        # self.stall_cycles_report_grid = []
+        # self.overall_utils_report_grid = []
+        # self.mapping_eff_report_grid = []
         self.cycles_report_avg_items = []
-        self.cycles_report_ready = False
+        self.bandwidth_report_avg_items = []
 
         # Flags
+        self.all_layer_run_done = False
         self.params_valid = False
         self.runs_done = False
         self.reports_dir_ready = False
+        
 
     def set_params(self,
                    config_filename='',
@@ -82,6 +84,9 @@ class Simulator:
         conf_list[6] = user_offsets[0]
         conf_list[7] = user_offsets[1]
         conf_list[8] = user_offsets[2]
+
+        # print("################################### \n", conf_list, "\n ############################# \n")
+
         single_arr_config.update_from_list(conf_list=conf_list)
 
         for layer_id in range(num_layers):
@@ -108,10 +113,64 @@ class Simulator:
                     print('SAVING TRACES')
                 this_layer_sim.save_traces()
 
-        self.generate_all_reports()
+        self.all_layer_run_done = True
         self.runs_done = True
+        self.generate_all_reports()
 
     # Report generation
+
+    def generate_all_reports(self):
+        assert self.all_layer_run_done, 'Layer runs are not done yet'
+        
+        self.create_cycles_report_structures()
+        self.create_bandwidth_report_structures()
+
+        compute_report_name = self.top_path + '/results/COMPUTE_REPORT_4_cores_test.csv'
+        compute_report = open(compute_report_name, 'w')
+        header = 'LayerID, Total Cycles, Stall Cycles, Overall Util %, Mapping Efficiency %, Compute Util %,\n'
+        compute_report.write(header)
+
+        bandwidth_report_name = self.top_path + '/results/BANDWIDTH_REPORT_4_cores_test.csv'
+        bandwidth_report = open(bandwidth_report_name, 'w')
+        header = 'LayerID, Avg IFMAP SRAM BW, Avg FILTER SRAM BW, Avg OFMAP SRAM BW, '
+        header += 'Avg IFMAP DRAM BW, Avg FILTER DRAM BW, Avg OFMAP DRAM BW,\n'
+        bandwidth_report.write(header)
+
+        # detail_report_name = self.top_path + '/DETAILED_ACCESS_REPORT.csv'
+        # detail_report = open(detail_report_name, 'w')
+        # header = 'LayerID, '
+        # header += 'SRAM IFMAP Start Cycle, SRAM IFMAP Stop Cycle, SRAM IFMAP Reads, '
+        # header += 'SRAM Filter Start Cycle, SRAM Filter Stop Cycle, SRAM Filter Reads, '
+        # header += 'SRAM OFMAP Start Cycle, SRAM OFMAP Stop Cycle, SRAM OFMAP Writes, '
+        # header += 'DRAM IFMAP Start Cycle, DRAM IFMAP Stop Cycle, DRAM IFMAP Reads, '
+        # header += 'DRAM Filter Start Cycle, DRAM Filter Stop Cycle, DRAM Filter Reads, '
+        # header += 'DRAM OFMAP Start Cycle, DRAM OFMAP Stop Cycle, DRAM OFMAP Writes,\n'
+        # detail_report.write(header)
+
+        for lid in range(self.workload_obj.get_num_layers()):
+            # single_layer_obj = self.single_layer_objects_list[lid]
+            compute_report_items_this_layer = self.cycles_report_avg_items
+            log = str(lid) +', '
+            log += ', '.join([str(x) for x in compute_report_items_this_layer])
+            log += ',\n'
+            compute_report.write(log)
+
+            bandwidth_report_items_this_layer = self.bandwidth_report_avg_items
+            log = str(lid) + ', '
+            log += ', '.join([str(x) for x in bandwidth_report_items_this_layer])
+            log += ',\n'
+            bandwidth_report.write(log)
+
+            # detail_report_items_this_layer = single_layer_obj.get_detail_report_items()
+            # log = str(lid) + ', '
+            # log += ', '.join([str(x) for x in detail_report_items_this_layer])
+            # log += ',\n'
+            # detail_report.write(log)
+
+        compute_report.close()
+        bandwidth_report.close()
+        # detail_report.close()
+
     def create_cycles_report_structures(self):
         assert self.runs_done
 
@@ -130,25 +189,41 @@ class Simulator:
             self.cycles_report_avg_items += [statistics.mean(mapping_eff_list)]
             self.cycles_report_avg_items += [statistics.mean(compute_util_list)]
 
-        self.cycles_report_ready = True
-
 
     def create_bandwidth_report_structures(self):
-        print('WIP')
+        assert self.runs_done
 
-    def create_detailed_report_structures(self):
-        print('WIP')
+        for lid in range(self.workload_obj.get_num_layers()):
+            this_layer_sim_obj = self.single_layer_objects_list[lid]
 
-    def save_all_cycle_reports(self):
-        print('WIP')
+            avg_ifmap_sram_bw_list = this_layer_sim_obj.get_avg_ifmap_sram_bw_list()
+            avg_filter_sram_bw_list = this_layer_sim_obj.get_avg_filter_sram_bw_list()
+            avg_ofmap_sram_bw_list = this_layer_sim_obj.get_avg_ofmap_sram_bw_list()
 
-    def save_all_bw_reports(self):
-        print('WIP')
+            avg_ifmap_dram_bw_list = this_layer_sim_obj.get_avg_ifmap_dram_bw_list()
+            avg_filter_dram_bw_list = this_layer_sim_obj.get_avg_filter_dram_bw_list()
+            avg_ofmap_dram_bw_list = this_layer_sim_obj.get_avg_ofmap_dram_bw_list()
 
-    def save_all_detailed_reports(self):
-        print('WIP')
+            self.bandwidth_report_avg_items += [statistics.mean(avg_ifmap_sram_bw_list)]
+            self.bandwidth_report_avg_items += [statistics.mean(avg_filter_sram_bw_list)]
+            self.bandwidth_report_avg_items += [statistics.mean(avg_ofmap_sram_bw_list)]
+            self.bandwidth_report_avg_items += [statistics.mean(avg_ifmap_dram_bw_list)]
+            self.bandwidth_report_avg_items += [statistics.mean(avg_filter_dram_bw_list)]
+            self.bandwidth_report_avg_items += [statistics.mean(avg_ofmap_dram_bw_list)]
 
-    def save_traces(self):
-        print('WIP')
+    # def create_detailed_report_structures(self):
+    #     print('WIP')
+
+    # def save_all_cycle_reports(self):
+    #     print('WIP')
+
+    # def save_all_bw_reports(self):
+    #     print('WIP')
+
+    # def save_all_detailed_reports(self):
+    #     print('WIP')
+
+    # def save_traces(self):
+    #     print('WIP')
 
 

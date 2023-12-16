@@ -56,7 +56,7 @@ class PartitionManager:
                                                 )
 
             entry = [lid, input_parts, filter_parts, opt_unit, opt_dataflow]
-            self.partition_table = [entry]
+            self.partition_table += [entry]
 
     #
     def create_opt_const_df_part_table(self):

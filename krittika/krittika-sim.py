@@ -15,8 +15,9 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
 
+    
     parser.add_argument('-t', metavar='Topology file', type=str,
-                        default='../topologies/conv_nets/test.csv',
+                        default='../topologies/conv_nets/alexnet_part.csv', # Change the topography file here
                         help='Path to the topology CSV file'
                         )
 
@@ -67,4 +68,4 @@ if __name__ == '__main__':
 
     krittika.run()
 
-    print('Krittika Run Done')
+    print('Run Done')

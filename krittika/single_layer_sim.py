@@ -3,6 +3,7 @@ import os.path
 
 from scalesim.compute.operand_matrix import operand_matrix
 from scalesim.memory.double_buffered_scratchpad_mem import double_buffered_scratchpad
+# from scalesim.memory.double_buffered_scratchpad_mem_L2 import double_buffered_scratchpad_L2
 
 from krittika.config.krittika_config import KrittikaConfig
 from krittika.partition_manager import PartitionManager
@@ -106,6 +107,7 @@ class SingleLayerSim:
 
         self.run_compute_all_parts()
         self.run_mem_sim_all_parts()
+        self.gather_report_items_across_cores()
 
     #
     def run_compute_all_parts(self):
@@ -122,7 +124,6 @@ class SingleLayerSim:
             ifmap_part = ifmap_matrix[ifmap_row_start:ifmap_row_end,:]
 
             for filt_part in range(self.num_filter_part):
-
                 filt_col_start = filt_part * filter_cols_per_part
                 filt_col_end = min(filt_col_start + filter_cols_per_part, filter_matrix.shape[1])
 
@@ -149,14 +150,22 @@ class SingleLayerSim:
         assert self.compute_done
 
         bandwidth_mode = self.config_obj.get_bandwidth_use_mode()
+
+        # print("\n ################################## ", type(self.config_obj.get_per_unit_sram_sizes_kb()), " ################################## \n")
         per_core_ifmap_buf_size, per_core_fitler_buf_size, per_core_ofmap_buf_size \
-            = self.config_obj.get_per_unit_sram_sizes_kb() * 1024
+            = self.config_obj.get_per_unit_sram_sizes_kb()
+        
+        per_core_ifmap_buf_size = per_core_ifmap_buf_size * 1024
+        per_core_fitler_buf_size = per_core_fitler_buf_size * 1024
+        per_core_ofmap_buf_size = per_core_ofmap_buf_size * 1024
 
         per_core_ifmap_bw, per_core_filter_bw, per_core_ofmap_bw\
             = self.config_obj.get_interface_bandwidths()
 
+        partition = 0
         for compute_node in self.compute_node_list:
-
+            print("Running partition: " + str(partition))
+            partition = partition + 1
             this_part_mem = double_buffered_scratchpad()
             this_part_mem.set_params(verbose=self.verbose,
                                      estimate_bandwidth_mode=bandwidth_mode,
@@ -172,7 +181,7 @@ class SingleLayerSim:
             this_node_ifmap_demand_mat, this_node_filter_demand_mat, this_node_ofmap_demand_mat \
                 = compute_node.get_demand_matrices()
 
-            this_node_ifmap_fetch_mat, this_node_filter_fetch_mat = compute_node.get_fetch_matrices()
+            this_node_ifmap_fetch_mat, this_node_filter_fetch_mat = compute_node.get_prefetch_matrices()
 
             this_part_mem.set_read_buf_prefetch_matrices(ifmap_prefetch_mat=this_node_ifmap_fetch_mat,
                                                          filter_prefetch_mat=this_node_filter_fetch_mat
@@ -195,10 +204,10 @@ class SingleLayerSim:
 
             # Compute report
             num_compute = compute_system.get_num_compute()
-            num_mac_unit = compute_system.get_num_mac_unit()
+            num_mac_unit = compute_system.get_num_mac_units()
             total_cycles = memory_system.get_total_compute_cycles()
             stall_cycles = memory_system.get_stall_cycles()
-            overall_util = (num_compute * 100) / total_cycles * num_mac_unit
+            overall_util = (num_compute * 100) / (total_cycles * num_mac_unit)
             mapping_eff = compute_system.get_avg_mapping_efficiency() * 100
             compute_util = compute_system.get_avg_compute_utilization() * 100
 
@@ -209,9 +218,9 @@ class SingleLayerSim:
             self.compute_util_list += [compute_util]
 
             # BW report
-            ifmap_sram_reads = compute_system.get_ifmap_requests()
-            filter_sram_reads = compute_system.get_filter_requests()
-            ofmap_sram_writes = compute_system.get_ofmap_requests()
+            ifmap_sram_reads = compute_system.get_ifmap_requests() 
+            filter_sram_reads = compute_system.get_filter_requests() 
+            ofmap_sram_writes = compute_system.get_ofmap_requests() 
             avg_ifmap_sram_bw = ifmap_sram_reads / total_cycles
             avg_filter_sram_bw = filter_sram_reads / total_cycles
             avg_ofmap_sram_bw = ofmap_sram_writes / total_cycles
@@ -301,6 +310,42 @@ class SingleLayerSim:
             this_core_dir = l2_dir + '/core' + str(core_id)
             self.check_and_build(this_core_dir)
 
+    def get_total_cycles_list(self):
+        return self.total_cycles_list
+    
+    def get_stall_cycles_list(self):
+        return self.stall_cycles_list
+
+    def get_overall_util_list(self):
+        return self.overall_util_list
+
+    def get_mapping_eff_list(self):
+        return self.mapping_eff_list
+
+    def get_compute_util_list(self):
+        return self.compute_util_list
+    
+    # SRAM
+    def get_avg_ifmap_sram_bw_list(self):
+        return self.avg_ifmap_sram_bw_list
+    
+    def get_avg_filter_sram_bw_list(self):
+        return self.avg_filter_sram_bw_list
+    
+    def get_avg_ofmap_sram_bw_list(self):
+        return self.avg_ofmap_sram_bw_list
+    
+    # DRAM
+    def get_avg_ifmap_dram_bw_list(self):
+        return self.avg_ifmap_dram_bw_list
+    
+    def get_avg_filter_dram_bw_list(self):
+        return self.avg_filter_dram_bw_list
+    
+    def get_avg_ofmap_dram_bw_list(self):
+        return self.avg_ofmap_dram_bw_list
+    
+    
 
     @staticmethod
     def check_and_build(dirname):

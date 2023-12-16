@@ -11,7 +11,7 @@ from krittika.compute.mat_mul.systolic_mat_mul_is import SystolicMatMulIS
 class ComputeNode:
     def __init__(self):
         # Valid identifiers
-        self.valid_compute_units = ['MMX', 'VEC']
+        self.valid_compute_units = ['matmul', 'vector']
         self.valid_dataflow = ['os', 'ws', 'is']
 
         # Member Objects
@@ -20,7 +20,7 @@ class ComputeNode:
 
         # State
         self.dataflow = 'os'
-        self.compute_unit = 'MMX'
+        self.compute_unit = 'matmul'
 
         # Operand_matrices
         self.ifmap_matrix = np.ones((1, 1))
@@ -35,7 +35,7 @@ class ComputeNode:
     #
     def set_params(self,
                    config=KrittikaConfig(),
-                   compute_unit='MMX',
+                   compute_unit='matmul',
                    dataflow='ws'):
 
         assert compute_unit in self.valid_compute_units
@@ -45,7 +45,7 @@ class ComputeNode:
         self.compute_unit = compute_unit
         self.dataflow = dataflow
 
-        if compute_unit == 'MMX':
+        if compute_unit == 'matmul':
             if dataflow == 'os':
                 self.selected_compute_node = SystolicMatMulOS()
 
@@ -65,7 +65,7 @@ class ComputeNode:
                     op_inmat2=self.filter_matrix
                 )
 
-        elif compute_unit == 'VEC':
+        elif compute_unit == 'vector':
             if dataflow == 'os':
                 self.selected_compute_node = VectorOS()
                 if self.operands_valid:
@@ -113,7 +113,7 @@ class ComputeNode:
         self.operands_valid = True
 
         if self.params_set:
-            if self.dataflow == 'is' and self.compute_unit == 'VEC':
+            if self.dataflow == 'is' and self.compute_unit == 'vector':
                 self.selected_compute_node.set_operands(
                     op_outmat=self.ofmap_matrix,
                     op_inmat1=self.filter_matrix,
@@ -158,8 +158,29 @@ class ComputeNode:
     def get_num_mac_units(self):
         assert self.params_set
 
-        return self.compute_unit.get_num_macs()
+        return self.selected_compute_node.get_num_mac()
 
+    def get_avg_mapping_efficiency(self):
+        assert self.operands_valid
+
+        return self.selected_compute_node.get_avg_mapping_efficiency()
+    
+    def get_avg_compute_utilization(self):
+        assert self.operands_valid
+
+        return self.selected_compute_node.get_avg_compute_utilization()
+    
+    def get_ifmap_requests(self):
+
+        return self.selected_compute_node.get_mat1_reads()
+    
+    def get_filter_requests(self):
+
+        return self.selected_compute_node.get_mat2_reads()
+    
+    def get_ofmap_requests(self):
+
+        return self.selected_compute_node.get_outmat_writes()
 
 
 
